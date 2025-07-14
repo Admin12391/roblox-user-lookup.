@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Roblox User Finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f5f7fa;
+      margin: 0;
+      padding: 40px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .card {
+      background: white;
+      padding: 30px;
+      border-radius: 15px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+      max-width: 400px;
+      width: 100%;
+    }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      font-size: 16px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+    button {
+      background: #4caf50;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .result {
+      margin-top: 20px;
+      text-align: left;
+    }
+    .label {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .error {
+      color: red;
+    }
+    a {
+      color: #007bff;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Roblox User Lookup</h2>
+    <input id="username" type="text" placeholder="Enter Roblox username" />
+    <button onclick="lookupUser()">Lookup</button>
+    <div class="result" id="result"></div>
+  </div>
+
+  <script>
+    async function lookupUser() {
+      const username = document.getElementById('username').value.trim();
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = 'Loading...';
+
+      try {
+        const userRes = await fetch('https://users.roblox.com/v1/usernames/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usernames: [username] })
+        });
+        const userData = await userRes.json();
+        const user = userData.data[0];
+        if (!user) throw new Error('User not found');
+
+        const presenceRes = await fetch('https://presence.roblox.com/v1/presence/users', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userIds: [user.id] })
+        });
+        const presenceData = await presenceRes.json();
+        const presence = presenceData.userPresences[0];
+
+        const statusMap = ['Offline', 'Online (not in game)', 'In Game'];
+        const presenceText = statusMap[presence.userPresenceType];
+
+        let html = `
+          <div><span class='label'>Username:</span> ${user.name}</div>
+          <div><span class='label'>Display Name:</span> ${user.displayName}</div>
+          <div><span class='label'>User ID:</span> ${user.id}</div>
+          <div><span class='label'>Status:</span> ${presenceText}</div>
+          <div><a href="https://www.roblox.com/users/${user.id}/profile" target="_blank">🔗 View Profile</a></div>
+        `;
+
+        // Show game info if user is in game
+        if (presence.userPresenceType === 2 && presence.universeId) {
+          const gameRes = await fetch(`https://games.roblox.com/v1/games?universeIds=${presence.universeId}`);
+          const gameData = await gameRes.json();
+          const game = gameData.data[0];
+          if (game) {
+            html += `
+              <hr>
+              <div><span class='label'>🎮 Currently Playing:</span></div>
+              <div>${game.name} by ${game.creator.name}</div>
+              <div><a href="https://www.roblox.com/games/${game.rootPlaceId}" target="_blank">🌐 Game Link</a></div>
+            `;
+          }
+        }
+
+        resultDiv.innerHTML = html;
+      } catch (e) {
+        resultDiv.innerHTML = `<p class='error'>❌ ${e.message}</p>`;
+      }
+    }
+  </script>
+</body>
+</html>
